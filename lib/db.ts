@@ -61,20 +61,19 @@ export async function upsertActivity(activity: Activity): Promise<void> {
   // 2. If not found, try to find by normalized created_at and name
   if (!existing && activity.created_at) {
     const normalizedTime = new Date(activity.created_at).getTime();
-
+    
     // Fetch activities from the same day to narrow down (optimization)
     const startDate = new Date(normalizedTime - 60000).toISOString(); // 1 min before
-    const endDate = new Date(normalizedTime + 60000).toISOString(); // 1 min after
-
+    const endDate = new Date(normalizedTime + 60000).toISOString();   // 1 min after
+    
     const candidates = await db.activities
       .where("created_at")
       .between(startDate, endDate)
       .toArray();
 
-    existing = candidates.find(
-      (a) =>
-        new Date(a.created_at || "").getTime() === normalizedTime &&
-        a.name === activity.name,
+    existing = candidates.find(a => 
+      new Date(a.created_at || "").getTime() === normalizedTime && 
+      a.name === activity.name
     );
   }
 
@@ -83,7 +82,7 @@ export async function upsertActivity(activity: Activity): Promise<void> {
     // but update all other fields with remote data
     const localId = existing.id;
     const { id, ...remoteData } = activity;
-
+    
     await db.activities.update(localId!, {
       ...remoteData,
       id: localId, // Keep local ID

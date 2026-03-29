@@ -26,17 +26,22 @@ export function ActivityHistory({
     setEditingActivity(activity);
     setEditName(activity.name);
     setEditType(activity.type);
+    
+    // Format dates for datetime-local input (using local timezone)
+    const toLocalISOString = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const offset = date.getTimezoneOffset();
+      const localDate = new Date(date.getTime() - offset * 60 * 1000);
+      return localDate.toISOString().slice(0, 16);
+    };
 
-    // Format dates for datetime-local input
     if (activity.start_time) {
-      setEditStartTime(
-        new Date(activity.start_time).toISOString().slice(0, 16),
-      );
+      setEditStartTime(toLocalISOString(activity.start_time));
     }
     if (activity.end_time) {
-      setEditEndTime(new Date(activity.end_time).toISOString().slice(0, 16));
+      setEditEndTime(toLocalISOString(activity.end_time));
     } else {
-      setEditEndTime("");
+      setEditEndTime('');
     }
   };
 

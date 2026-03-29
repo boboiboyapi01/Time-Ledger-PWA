@@ -55,12 +55,42 @@ export async function showTimerNotification(
   }
 }
 
+export async function startBackgroundTimer(
+  activityName: string,
+  startTime: number
+): Promise<void> {
+  if ('serviceWorker' in navigator) {
+    const registration = await navigator.serviceWorker.ready;
+    if (registration.active) {
+      registration.active.postMessage({
+        type: 'START_BACKGROUND_TIMER',
+        payload: {
+          activityName,
+          startTime,
+        },
+      });
+    }
+  }
+}
+
+export async function stopBackgroundTimer(): Promise<void> {
+  if ('serviceWorker' in navigator) {
+    const registration = await navigator.serviceWorker.ready;
+    if (registration.active) {
+      registration.active.postMessage({
+        type: 'STOP_BACKGROUND_TIMER',
+      });
+    }
+  }
+}
+
 export async function closeTimerNotification(): Promise<void> {
   if ('serviceWorker' in navigator && 'Notification' in window) {
     try {
       const registration = await navigator.serviceWorker.ready;
       const notifications = await registration.getNotifications({ tag: 'timer-notification' });
       notifications.forEach(notification => notification.close());
+      stopBackgroundTimer();
     } catch (error) {
       console.error('Error closing notification:', error);
     }

@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { TimerState, ActivityType } from '@/lib/types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { TimerState, ActivityType } from "@/lib/types";
 
-const TIMER_KEY = 'timerState';
+const TIMER_KEY = "timerState";
 
 export function useTimer() {
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
-    currentActivityName: '',
-    currentActivityType: 'positive',
+    currentActivityName: "",
+    currentActivityType: "positive",
     elapsedSeconds: 0,
     startTime: undefined,
   });
@@ -21,15 +21,15 @@ export function useTimer() {
     const saved = localStorage.getItem(TIMER_KEY);
     if (saved) {
       const state = JSON.parse(saved);
-      setTimerState(state);
-      
       // If timer was running, resume it
       if (state.isRunning && state.startTime) {
         const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
-        setTimerState(prev => ({
-          ...prev,
-          elapsedSeconds: prev.elapsedSeconds + elapsed,
-        }));
+        setTimerState({
+          ...state,
+          elapsedSeconds: elapsed,
+        });
+      } else {
+        setTimerState(state);
       }
     }
   }, []);
@@ -39,13 +39,37 @@ export function useTimer() {
     localStorage.setItem(TIMER_KEY, JSON.stringify(timerState));
   }, [timerState]);
 
+  // Handle visibility change to recalculate elapsed time when returning from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "visible" &&
+        timerState.isRunning &&
+        timerState.startTime
+      ) {
+        const elapsed = Math.floor((Date.now() - timerState.startTime) / 1000);
+        setTimerState((prev) => ({
+          ...prev,
+          elapsedSeconds: elapsed,
+        }));
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [timerState.isRunning, timerState.startTime]);
+
   // Timer interval effect
   useEffect(() => {
-    if (timerState.isRunning) {
+    if (timerState.isRunning && timerState.startTime) {
       intervalRef.current = setInterval(() => {
-        setTimerState(prev => ({
+        const elapsed = Math.floor(
+          (Date.now() - (timerState.startTime || 0)) / 1000,
+        );
+        setTimerState((prev) => ({
           ...prev,
-          elapsedSeconds: prev.elapsedSeconds + 1,
+          elapsedSeconds: elapsed,
         }));
       }, 1000);
     } else {
@@ -58,7 +82,7 @@ export function useTimer() {
   }, [timerState.isRunning]);
 
   const startTimer = useCallback((name: string, type: ActivityType) => {
-    setTimerState(prev => ({
+    setTimerState((prev) => ({
       ...prev,
       isRunning: true,
       currentActivityName: name,
@@ -69,7 +93,7 @@ export function useTimer() {
   }, []);
 
   const stopTimer = useCallback(() => {
-    setTimerState(prev => ({
+    setTimerState((prev) => ({
       ...prev,
       isRunning: false,
       startTime: undefined,
@@ -79,8 +103,8 @@ export function useTimer() {
   const resetTimer = useCallback(() => {
     setTimerState({
       isRunning: false,
-      currentActivityName: '',
-      currentActivityType: 'positive',
+      currentActivityName: "",
+      currentActivityType: "positive",
       elapsedSeconds: 0,
       startTime: undefined,
     });
@@ -90,7 +114,7 @@ export function useTimer() {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
   return {

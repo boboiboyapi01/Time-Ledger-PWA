@@ -21,6 +21,8 @@ import {
   requestNotificationPermission,
   showTimerNotification,
   closeTimerNotification,
+  startBackgroundTimer,
+  stopBackgroundTimer,
 } from "@/lib/notifications";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -47,8 +49,8 @@ export default function TimerComponent() {
     }
 
     const activity: Activity = {
-      name: activityName,
-      type: activityType,
+      name: timerState.currentActivityName || activityName,
+      type: timerState.currentActivityType || activityType,
       start_time: new Date(
         Date.now() - timerState.elapsedSeconds * 1000,
       ).toISOString(),
@@ -105,15 +107,21 @@ export default function TimerComponent() {
 
   useEffect(() => {
     if (timerState.isRunning && notificationEnabled) {
-      // Only update notification every 5 seconds to save battery and reduce spam
-      if (timerState.elapsedSeconds % 5 === 0) {
-        showTimerNotification(
-          timerState,
-          formatTime(timerState.elapsedSeconds),
-        );
-      }
+      // Start background timer in Service Worker
+      startBackgroundTimer(
+        timerState.currentActivityName,
+        timerState.startTime || Date.now(),
+      );
+    } else if (!timerState.isRunning) {
+      // Stop background timer in Service Worker
+      stopBackgroundTimer();
     }
-  }, [timerState.isRunning, timerState.elapsedSeconds, notificationEnabled]);
+  }, [
+    timerState.isRunning,
+    notificationEnabled,
+    timerState.currentActivityName,
+    timerState.startTime,
+  ]);
 
   const handleStart = () => {
     if (!activityName.trim()) {

@@ -61,10 +61,18 @@ export function useSyncActivities() {
           .from("activities")
           .upsert(
             unsyncedActivities.map(({ id, synced, ...activity }) => {
+              if (!activity.name) {
+                console.error("Attempting to sync activity without name:", activity);
+              }
               const activityToSync: any = {
                 ...activity,
                 user_id: userId || null,
               };
+              // Ensure we are sending valid ISO strings
+              if (activity.start_time) activityToSync.start_time = new Date(activity.start_time).toISOString();
+              if (activity.end_time) activityToSync.end_time = new Date(activity.end_time).toISOString();
+              if (activity.created_at) activityToSync.created_at = new Date(activity.created_at).toISOString();
+              
               // Only include ID if it's a UUID (string)
               if (typeof id === "string" && id.includes("-")) {
                 activityToSync.id = id;

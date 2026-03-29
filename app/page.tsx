@@ -224,7 +224,7 @@ export default function Home() {
                 <motion.div 
                   key="analytics" 
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} 
-                  className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full"
+                  className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-full"
                 >
                   <div className="lg:col-span-1 border border-slate-200 bg-white rounded-3xl shadow-sm overflow-hidden flex flex-col">
                     <DailyPieChart activities={activities} />

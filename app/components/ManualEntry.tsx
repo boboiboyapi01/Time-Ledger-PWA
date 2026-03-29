@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, ActivityType } from '@/lib/types';
-import { saveActivityLocal } from '@/lib/db';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Activity, ActivityType } from "@/lib/types";
+import { saveActivityLocal } from "@/lib/db";
 
 interface ManualEntryProps {
   onActivityAdded?: (activity: Activity) => void;
@@ -11,45 +11,32 @@ interface ManualEntryProps {
 
 export function ManualEntry({ onActivityAdded }: ManualEntryProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [type, setType] = useState<ActivityType>('positive');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [hours, setHours] = useState('');
-  const [error, setError] = useState('');
+  const [name, setName] = useState("");
+  const [type, setType] = useState<ActivityType>("positive");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!name.trim()) {
-      setError('Activity name is required');
+      setError("Activity name is required");
       return;
     }
 
-    let duration = 0;
-    let start = new Date();
-    let end = new Date();
+    if (!startTime || !endTime) {
+      setError("Start and end times are required");
+      return;
+    }
 
-    // Calculate duration based on input method
-    if (hours) {
-      duration = Math.round(parseFloat(hours) * 3600);
-      start = new Date(Date.now() - duration * 1000);
-      end = new Date();
-    } else if (startTime && endTime) {
-      const startDate = new Date(startTime);
-      const endDate = new Date(endTime);
-      duration = Math.round((endDate.getTime() - startDate.getTime()) / 1000);
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const duration = Math.round((end.getTime() - start.getTime()) / 1000);
 
-      if (duration <= 0) {
-        setError('End time must be after start time');
-        return;
-      }
-
-      start = startDate;
-      end = endDate;
-    } else {
-      setError('Please enter either hours or start/end times');
+    if (duration <= 0) {
+      setError("End time must be after start time");
       return;
     }
 
@@ -66,14 +53,13 @@ export function ManualEntry({ onActivityAdded }: ManualEntryProps) {
       onActivityAdded?.(saved);
 
       // Reset form
-      setName('');
-      setType('positive');
-      setStartTime('');
-      setEndTime('');
-      setHours('');
+      setName("");
+      setType("positive");
+      setStartTime("");
+      setEndTime("");
       setIsOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save activity');
+      setError(err instanceof Error ? err.message : "Failed to save activity");
     }
   };
 
@@ -83,14 +69,14 @@ export function ManualEntry({ onActivityAdded }: ManualEntryProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium rounded-xl border border-slate-200 transition-colors shadow-sm"
       >
-        {isOpen ? 'Close' : '+ Add Manual Entry'}
+        {isOpen ? "Close" : "+ Add Manual Entry"}
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.form
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             onSubmit={handleSubmit}
             className="mt-4 p-5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4"
@@ -99,7 +85,7 @@ export function ManualEntry({ onActivityAdded }: ManualEntryProps) {
               type="text"
               placeholder="Activity name"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-2.5 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400 font-medium transition-all"
             />
 
@@ -109,66 +95,64 @@ export function ManualEntry({ onActivityAdded }: ManualEntryProps) {
                   type="radio"
                   name="type"
                   value="positive"
-                  checked={type === 'positive'}
-                  onChange={() => setType('positive')}
+                  checked={type === "positive"}
+                  onChange={() => setType("positive")}
                   className="w-4 h-4"
                 />
-                <span className="text-emerald-600 font-medium text-sm">Productive</span>
+                <span className="text-emerald-600 font-medium text-sm">
+                  Productive
+                </span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer flex-1 p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-rose-200 transition-colors">
                 <input
                   type="radio"
                   name="type"
                   value="negative"
-                  checked={type === 'negative'}
-                  onChange={() => setType('negative')}
+                  checked={type === "negative"}
+                  onChange={() => setType("negative")}
                   className="w-4 h-4 text-rose-500"
                 />
-                <span className="text-rose-600 font-medium text-sm">Distracting</span>
+                <span className="text-rose-600 font-medium text-sm">
+                  Distracting
+                </span>
               </label>
             </div>
 
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-slate-500 font-medium text-sm mb-3">Duration</p>
+              <p className="text-slate-500 font-medium text-sm mb-3">
+                Time Range
+              </p>
 
               <div className="space-y-3">
-                <input
-                  type="number"
-                  step="0.25"
-                  placeholder="Hours (e.g., 1.5)"
-                  value={hours}
-                  onChange={e => {
-                    setHours(e.target.value);
-                    setStartTime('');
-                    setEndTime('');
-                  }}
-                  className="w-full px-4 py-2.5 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400 font-medium transition-all"
-                />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
+                    Start Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400 font-medium transition-all"
+                  />
+                </div>
 
-                <p className="text-slate-500 text-xs text-center">OR</p>
-
-                <input
-                  type="datetime-local"
-                  value={startTime}
-                  onChange={e => {
-                    setStartTime(e.target.value);
-                    setHours('');
-                  }}
-                  placeholder="Start time"
-                  className="w-full px-4 py-2.5 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400 font-medium transition-all"
-                />
-
-                <input
-                  type="datetime-local"
-                  value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
-                  placeholder="End time"
-                  className="w-full px-4 py-2.5 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400 font-medium transition-all"
-                />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
+                    End Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400 font-medium transition-all"
+                  />
+                </div>
               </div>
             </div>
 
-            {error && <p className="text-rose-500 font-medium text-sm">{error}</p>}
+            {error && (
+              <p className="text-rose-500 font-medium text-sm">{error}</p>
+            )}
 
             <div className="flex gap-2 pt-2">
               <button

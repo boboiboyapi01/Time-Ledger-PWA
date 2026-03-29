@@ -23,22 +23,25 @@ export async function showTimerNotification(
   timeDisplay: string
 ): Promise<void> {
   if ('serviceWorker' in navigator && 'Notification' in window) {
+    if (Notification.permission !== 'granted') return;
+    
     try {
       const registration = await navigator.serviceWorker.ready;
       
-      // @ts-ignore - actions is not in NotificationOptions type but supported by browsers
-      registration.showNotification('Timer Running', {
+      // Use silent: true and re-use tag to prevent multiple buzzes/sounds
+      // @ts-ignore
+      registration.showNotification('Time Ledger Timer', {
         body: `${timerState.currentActivityName}: ${timeDisplay}`,
-        icon: '/vercel.svg',
-        badge: '/vercel.svg',
+        icon: '/sand-clock.png',
+        badge: '/sand-clock.png',
         tag: 'timer-notification',
         requireInteraction: true,
-        // @ts-ignore - actions property is supported by browsers but not in TypeScript types
+        silent: true, // IMPORTANT: Prevents constant buzzing
+        // @ts-ignore
         actions: [
           {
             action: 'stop-timer',
             title: 'Stop Timer',
-            icon: '/vercel.svg',
           },
         ],
         data: {
@@ -48,6 +51,18 @@ export async function showTimerNotification(
       });
     } catch (error) {
       console.error('Error showing notification:', error);
+    }
+  }
+}
+
+export async function closeTimerNotification(): Promise<void> {
+  if ('serviceWorker' in navigator && 'Notification' in window) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const notifications = await registration.getNotifications({ tag: 'timer-notification' });
+      notifications.forEach(notification => notification.close());
+    } catch (error) {
+      console.error('Error closing notification:', error);
     }
   }
 }

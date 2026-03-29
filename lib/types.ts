@@ -3,7 +3,7 @@
 export type ActivityType = 'positive' | 'negative';
 
 export interface Activity {
-  id?: string;
+  id?: string | number;
   user_id?: string;
   name: string;
   type: ActivityType;

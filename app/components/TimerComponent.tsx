@@ -1,15 +1,29 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Square, Bell, BellOff, RefreshCw, AlertCircle, CheckCircle2, ShieldAlert, Cloud } from 'lucide-react';
-import { useTimer } from '@/lib/hooks/useTimer';
-import { useSyncActivities } from '@/lib/hooks/useSyncActivities';
-import { Activity, ActivityType } from '@/lib/types';
-import { saveActivityLocal } from '@/lib/db';
-import { requestNotificationPermission, showTimerNotification } from '@/lib/notifications';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Play,
+  Square,
+  Bell,
+  BellOff,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  ShieldAlert,
+  Cloud,
+} from "lucide-react";
+import { useTimer } from "@/lib/hooks/useTimer";
+import { useSyncActivities } from "@/lib/hooks/useSyncActivities";
+import { Activity, ActivityType } from "@/lib/types";
+import { saveActivityLocal } from "@/lib/db";
+import {
+  requestNotificationPermission,
+  showTimerNotification,
+  closeTimerNotification,
+} from "@/lib/notifications";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 // Helper for clean class merging
 function cn(...inputs: ClassValue[]) {
@@ -17,40 +31,27 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function TimerComponent() {
-  const { timerState, startTimer, stopTimer, resetTimer, formatTime } = useTimer();
+  const { timerState, startTimer, stopTimer, resetTimer, formatTime } =
+    useTimer();
   const { syncState } = useSyncActivities();
-  
-  const [activityName, setActivityName] = useState('');
-  const [activityType, setActivityType] = useState<ActivityType>('positive');
+
+  const [activityName, setActivityName] = useState("");
+  const [activityType, setActivityType] = useState<ActivityType>("positive");
   const [notificationEnabled, setNotificationEnabled] = useState(false);
 
-  useEffect(() => {
-    requestNotificationPermission().then(granted => {
-      setNotificationEnabled(granted);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (timerState.isRunning && notificationEnabled) {
-      showTimerNotification(timerState, formatTime(timerState.elapsedSeconds));
-    }
-  }, [timerState.isRunning, timerState.elapsedSeconds, notificationEnabled, timerState]);
-
-  const handleStart = () => {
-    if (!activityName.trim()) {
-      alert('Please enter an activity name');
-      return;
-    }
-    startTimer(activityName, activityType);
-  };
-
-  const handleStop = async () => {
+  const handleStop = useCallback(async () => {
     stopTimer();
+
+    if (notificationEnabled) {
+      closeTimerNotification();
+    }
 
     const activity: Activity = {
       name: activityName,
       type: activityType,
-      start_time: new Date(Date.now() - timerState.elapsedSeconds * 1000).toISOString(),
+      start_time: new Date(
+        Date.now() - timerState.elapsedSeconds * 1000,
+      ).toISOString(),
       end_time: new Date().toISOString(),
       duration: timerState.elapsedSeconds,
     };
@@ -58,15 +59,72 @@ export default function TimerComponent() {
     try {
       await saveActivityLocal(activity);
     } catch (error) {
-      console.error('Error saving activity:', error);
+      console.error("Error saving activity:", error);
     }
 
     resetTimer();
-    setActivityName('');
+    setActivityName("");
+  }, [
+    stopTimer,
+    notificationEnabled,
+    activityName,
+    activityType,
+    timerState.elapsedSeconds,
+    resetTimer,
+  ]);
+
+  useEffect(() => {
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "STOP_TIMER") {
+        handleStop();
+      }
+    };
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener(
+        "message",
+        handleServiceWorkerMessage,
+      );
+    }
+
+    return () => {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener(
+          "message",
+          handleServiceWorkerMessage,
+        );
+      }
+    };
+  }, [handleStop]);
+
+  useEffect(() => {
+    requestNotificationPermission().then((granted) => {
+      setNotificationEnabled(granted);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (timerState.isRunning && notificationEnabled) {
+      // Only update notification every 5 seconds to save battery and reduce spam
+      if (timerState.elapsedSeconds % 5 === 0) {
+        showTimerNotification(
+          timerState,
+          formatTime(timerState.elapsedSeconds),
+        );
+      }
+    }
+  }, [timerState.isRunning, timerState.elapsedSeconds, notificationEnabled]);
+
+  const handleStart = () => {
+    if (!activityName.trim()) {
+      alert("Please enter an activity name");
+      return;
+    }
+    startTimer(activityName, activityType);
   };
 
-  const isPositive = activityType === 'positive';
-  const accentColor = isPositive ? 'emerald' : 'rose';
+  const isPositive = activityType === "positive";
+  const accentColor = isPositive ? "emerald" : "rose";
 
   return (
     <div className="w-full h-full p-5 lg:p-8 bg-white rounded-3xl shadow-sm border border-slate-200 relative flex flex-col min-h-0">
@@ -78,22 +136,28 @@ export default function TimerComponent() {
             animate={{ opacity: 0.05 }}
             exit={{ opacity: 0 }}
             className={cn(
-              "absolute -top-32 -inset-x-20 h-[250px] blur-[80px] rounded-full pointer-events-none transition-colors duration-1000",
-              timerState.currentActivityType === 'positive' ? "bg-emerald-500" : "bg-rose-500"
+              "absolute -top-32 -inset-x-20 h-62.5 blur-[80px] rounded-full pointer-events-none transition-colors duration-1000",
+              timerState.currentActivityType === "positive"
+                ? "bg-emerald-500"
+                : "bg-rose-500",
             )}
           />
         )}
       </AnimatePresence>
 
       <div className="relative z-10 h-full flex flex-col">
-        <div className="flex justify-between items-center mb-4 flex-shrink-0">
+        <div className="flex justify-between items-center mb-4 shrink-0">
           <h2 className="text-xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
             Smart Timer
           </h2>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200">
-            {notificationEnabled ? <Bell className="w-3.5 h-3.5 text-emerald-500" /> : <BellOff className="w-3.5 h-3.5 text-slate-400" />}
+            {notificationEnabled ? (
+              <Bell className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <BellOff className="w-3.5 h-3.5 text-slate-400" />
+            )}
             <span className="hidden sm:inline text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {notificationEnabled ? 'Notifs On' : 'Notifs Off'}
+              {notificationEnabled ? "Notifs On" : "Notifs Off"}
             </span>
           </div>
         </div>
@@ -103,7 +167,11 @@ export default function TimerComponent() {
           <motion.div
             className="relative flex items-center justify-center w-56 h-56 lg:w-64 lg:h-64 rounded-full bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] group"
             animate={timerState.isRunning ? { scale: [1, 1.01, 1] } : {}}
-            transition={{ duration: 2, repeat: timerState.isRunning ? Infinity : 0, ease: "easeInOut" }}
+            transition={{
+              duration: 2,
+              repeat: timerState.isRunning ? Infinity : 0,
+              ease: "easeInOut",
+            }}
           >
             {/* SVG Progress Ring Timer */}
             <svg className="absolute inset-0 w-full h-full transform -rotate-90">
@@ -124,27 +192,29 @@ export default function TimerComponent() {
                 strokeLinecap="round"
                 className={cn(
                   "transition-all duration-1000 ease-linear",
-                  timerState.isRunning && timerState.currentActivityType === 'positive' 
-                    ? "stroke-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" 
-                    : timerState.isRunning && timerState.currentActivityType === 'negative' 
+                  timerState.isRunning &&
+                    timerState.currentActivityType === "positive"
+                    ? "stroke-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]"
+                    : timerState.isRunning &&
+                        timerState.currentActivityType === "negative"
                       ? "stroke-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]"
-                      : "stroke-transparent"
+                      : "stroke-transparent",
                 )}
                 style={{
-                  strokeDasharray: '289%',
-                  strokeDashoffset: timerState.isRunning 
+                  strokeDasharray: "289%",
+                  strokeDashoffset: timerState.isRunning
                     ? `calc(289% - (289% * ${(timerState.elapsedSeconds % 60) / 60}))`
-                    : '289%'
+                    : "289%",
                 }}
               />
             </svg>
-            
+
             <div className="flex flex-col items-center justify-center z-10">
               <div className="text-5xl lg:text-[4.5rem] leading-none font-black font-sans tracking-[-0.04em] text-slate-800 tabular-nums">
                 {formatTime(timerState.elapsedSeconds)}
               </div>
               <span className="text-[10px] lg:text-xs font-bold text-slate-400 tracking-[0.25em] uppercase mt-3">
-                {timerState.isRunning ? 'Focusing' : 'Idle'}
+                {timerState.isRunning ? "Focusing" : "Idle"}
               </span>
             </div>
           </motion.div>
@@ -159,10 +229,14 @@ export default function TimerComponent() {
                   exit={{ opacity: 0, y: -10 }}
                   className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/50 border border-slate-800"
                 >
-                  <div className={cn(
-                    "w-2 h-2 rounded-full animate-pulse",
-                    timerState.currentActivityType === 'positive' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_8px_rgba(243,64,64,0.5)]"
-                  )} />
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full animate-pulse",
+                      timerState.currentActivityType === "positive"
+                        ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                        : "bg-rose-500 shadow-[0_0_8px_rgba(243,64,64,0.5)]",
+                    )}
+                  />
                   <span className="text-sm font-medium text-slate-300">
                     {timerState.currentActivityName}
                   </span>
@@ -173,34 +247,44 @@ export default function TimerComponent() {
         </div>
 
         {/* Controls Section at the Bottom */}
-        <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0 mt-auto items-stretch">
+        <div className="flex flex-col sm:flex-row gap-3 shrink-0 mt-auto items-stretch">
           <div className="relative flex-1">
             <input
               type="text"
               placeholder="What are you working on?"
               value={activityName}
-              onChange={e => setActivityName(e.target.value)}
+              onChange={(e) => setActivityName(e.target.value)}
               disabled={timerState.isRunning}
-              className="w-full h-full px-5 py-3 lg:py-4 bg-slate-50 text-slate-800 rounded-xl border border-slate-200 hover:border-slate-300 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 placeholder-slate-400 disabled:opacity-50 transition-all font-medium text-sm lg:text-base min-h-[52px]"
+              className="w-full h-full px-5 py-3 lg:py-4 bg-slate-50 text-slate-800 rounded-xl border border-slate-200 hover:border-slate-300 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 placeholder-slate-400 disabled:opacity-50 transition-all font-medium text-sm lg:text-base min-h-13"
             />
           </div>
 
-          <div className="flex gap-2 sm:gap-3 h-[52px] lg:h-[58px] w-full sm:w-auto mt-2 sm:mt-0">
+          <div className="flex gap-2 sm:gap-3 h-13 lg:h-14.5 w-full sm:w-auto mt-2 sm:mt-0">
             {/* Toggle Button */}
             <button
-              onClick={() => setActivityType(isPositive ? 'negative' : 'positive')}
+              onClick={() =>
+                setActivityType(isPositive ? "negative" : "positive")
+              }
               disabled={timerState.isRunning}
               className={cn(
                 "flex-1 sm:flex-none flex items-center justify-center px-4 rounded-xl font-bold transition-all duration-300 text-xs sm:text-sm lg:text-base border shadow-sm select-none",
-                isPositive 
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" 
+                isPositive
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                   : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100",
-                timerState.isRunning && "opacity-50 cursor-not-allowed"
+                timerState.isRunning && "opacity-50 cursor-not-allowed",
               )}
-              title={isPositive ? "Switch to Distracting" : "Switch to Productive"}
+              title={
+                isPositive ? "Switch to Distracting" : "Switch to Productive"
+              }
             >
-              {isPositive ? <CheckCircle2 className="w-5 h-5 sm:mr-2" /> : <ShieldAlert className="w-5 h-5 sm:mr-2" />}
-              <span className="hidden sm:inline">{isPositive ? 'Productive' : 'Distracting'}</span>
+              {isPositive ? (
+                <CheckCircle2 className="w-5 h-5 sm:mr-2" />
+              ) : (
+                <ShieldAlert className="w-5 h-5 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">
+                {isPositive ? "Productive" : "Distracting"}
+              </span>
             </button>
 
             {/* Action Button */}
@@ -211,9 +295,9 @@ export default function TimerComponent() {
                 onClick={handleStart}
                 className={cn(
                   "flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 rounded-xl text-white font-bold text-xs sm:text-sm lg:text-base uppercase tracking-widest shadow-lg transition-all focus:outline-none focus:ring-2 ring-offset-2 ring-offset-white whitespace-nowrap",
-                  isPositive 
-                    ? "bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 focus:ring-emerald-400" 
-                    : "bg-gradient-to-r from-rose-400 to-rose-500 shadow-rose-500/30 hover:shadow-rose-500/50 focus:ring-rose-400"
+                  isPositive
+                    ? "bg-linear-to-r from-emerald-400 to-emerald-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 focus:ring-emerald-400"
+                    : "bg-linear-to-r from-rose-400 to-rose-500 shadow-rose-500/30 hover:shadow-rose-500/50 focus:ring-rose-400",
                 )}
               >
                 <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
@@ -235,7 +319,7 @@ export default function TimerComponent() {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-400 flex-shrink-0">
+        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-400 shrink-0">
           <div className="flex items-center gap-2">
             {syncState.isSyncing ? (
               <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
@@ -246,12 +330,15 @@ export default function TimerComponent() {
             ) : (
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             )}
-            
+
             <span>
-              {syncState.isSyncing ? 'Syncing to cloud...' :
-               syncState.error ? syncState.error :
-               syncState.pendingCount > 0 ? `Waiting to sync (${syncState.pendingCount})` : 
-               'All data securely synced'}
+              {syncState.isSyncing
+                ? "Syncing to cloud..."
+                : syncState.error
+                  ? syncState.error
+                  : syncState.pendingCount > 0
+                    ? `Waiting to sync (${syncState.pendingCount})`
+                    : "All data securely synced"}
             </span>
           </div>
           <div>Local Dexie Cache</div>
